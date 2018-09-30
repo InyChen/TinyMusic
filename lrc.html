@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8>
+    <title>lrc</title>
+    <style type="text/css">
+        body,
+        html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            box-sizing: border-box;
+        }
+
+        .page-disabled {
+            background: transparent;
+            border: 1px solid transparent;
+        }
+
+        .lrc {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            line-height: 60px;
+            white-space: nowrap;
+            user-select: none;
+            color: #fff;
+            text-shadow: 1px 1px 1px #000;
+            -webkit-text-stroke: 1px rgba(0, 0, 0, 0.2);
+            font-size: 20px;
+            font-family: 'MicroSoft YaHei', 'Avenir', Helvetica, Arial, sans-serif;
+        }
+
+        .lrc-cover {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            transition-property: right;
+            overflow: hidden;
+        }
+
+        .lrc-cover .lrc {
+            top: 0;
+            left: 0;
+            transform: none;
+            color: red;
+            background: transparent;
+        }
+
+        .lock {
+            position: absolute;
+            z-index: 1988;
+            top: 0;
+            right: 0;
+            cursor: pointer;
+        }
+
+        .lock:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="page" :class="{'page-disabled':locked}" @mousedown="mouseDown" @mousemove="drag" @mouseup="isDraging=false">
+        <div class="lock" v-show="!locked" @click="lock">锁定</div>
+        <div class="lrc">
+            {{text}}
+            <div class="lrc-cover">
+                <div class="lrc" :class="{'lrc-disabled':locked}">
+                    {{text}}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="./node_modules/vue/dist/vue.min.js"></script>
+    <script>
+        const { ipcRenderer, remote } = require('electron');
+        const win = remote.getCurrentWindow();
+
+        const app = new Vue({
+            el: "#app",
+            data: function () {
+                return {
+                    text: "--",
+                    duration: 0,
+                    percent: 0,
+                    locked: false,
+                    isDraging: false,
+                    pageX: 0,
+                    pageY: 0
+                }
+            },
+            methods: {
+                mouseDown(e) {
+                    this.isDraging = true;
+                    this.pageX = e.pageX;
+                    this.pageY = e.pageY;
+                },
+                drag(e) {
+                    if (this.isDraging) {
+                        let bounds = win.getBounds();
+                        bounds.x = e.screenX - this.pageX;
+                        bounds.y = e.screenY - this.pageY;
+                        win.setBounds(bounds);
+                    }
+                },
+                lock() {
+                    this.locked = true;
+                    win.setIgnoreMouseEvents(true);
+                }
+            },
+            created() {
+                //解锁
+                ipcRenderer.on('lrc-unlock', (event) => {
+                    this.locked = false;
+                    win.setIgnoreMouseEvents(false);
+                });
+                ipcRenderer.on('lrc-change', (event, lrc) => {
+                    if (lrc) {
+                        let cover = document.querySelector(".lrc-cover");
+                        this.text = lrc.text;
+                        cover.style.transitionDuration = "0s";
+                        cover.style.right = "100%";
+                        if (lrc.duration > 1) {
+                            setTimeout(function () {
+                                cover.style.transitionDuration = lrc.duration - 0.01 + "s";
+                                cover.style.right = "0";
+                            }, 1);
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
